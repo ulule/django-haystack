@@ -410,6 +410,9 @@ class MultiValueField(SearchField):
         if kwargs.get('use_template') is True:
             raise SearchFieldError("'%s' fields can not use templates to prepare their data." % self.__class__.__name__)
 
+        if ((5, 0, 0) <= elasticsearch.__version__ < (6, 0, 0)) and self.field_type == 'string':
+            self.field_type = 'text'
+
         super(MultiValueField, self).__init__(**kwargs)
         self.is_multivalued = True
 
