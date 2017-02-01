@@ -8,8 +8,8 @@ from django.conf import settings
 
 import haystack
 from haystack.backends import BaseEngine
-from haystack.backends.elasticsearch_backend import ElasticsearchSearchBackend, ElasticsearchSearchQuery
-from haystack.constants import DEFAULT_OPERATOR, DJANGO_CT, FUZZINESS
+from haystack.backends.elasticsearch_backend import ElasticsearchSearchBackend, ElasticsearchSearchQuery, FIELD_MAPPINGS
+from haystack.constants import DEFAULT_OPERATOR, DJANGO_CT, FUZZINESS, DJANGO_ID
 from haystack.exceptions import MissingDependency
 from haystack.utils import get_identifier, get_model_ct
 
@@ -22,6 +22,13 @@ except ImportError:
     raise MissingDependency("The 'elasticsearch5' backend requires the \
                             installation of 'elasticsearch>=5.0.0,<6.0.0'. \
                             Please refer to the documentation.")
+
+
+DEFAULT_FIELD_MAPPING = {'type': 'text', 'analyzer': 'snowball'}
+FIELD_MAPPINGS.update({
+    'text': {'type': 'text', 'analyzer': 'snowball'},
+    'keyword': {'type': 'keyword'}
+})
 
 
 class Elasticsearch5SearchBackend(ElasticsearchSearchBackend):
@@ -70,6 +77,32 @@ class Elasticsearch5SearchBackend(ElasticsearchSearchBackend):
                                ','.join(models_to_delete), e, exc_info=True)
             else:
                 self.log.error("Failed to clear Elasticsearch index: %s", e, exc_info=True)
+
+    def build_schema(self, fields):
+        content_field_name = ''
+        mapping = {
+            DJANGO_CT: {'type': 'keyword', 'index': 'not_analyzed', 'include_in_all': False},
+            DJANGO_ID: {'type': 'keyword', 'index': 'not_analyzed', 'include_in_all': False},
+        }
+
+        for field_name, field_class in fields.items():
+            field_mapping = FIELD_MAPPINGS.get(field_class.field_type, DEFAULT_FIELD_MAPPING).copy()
+            if field_class.boost != 1.0:
+                field_mapping['boost'] = field_class.boost
+
+            if field_class.document is True:
+                content_field_name = field_class.index_fieldname
+
+            # Do this last to override `text` fields.
+            if field_mapping['type'] == 'string':
+                if field_class.indexed is False or hasattr(field_class, 'facet_for'):
+                    field_mapping['index'] = 'not_analyzed'
+                    del field_mapping['analyzer']
+
+            mapping[field_class.index_fieldname] = field_mapping
+
+        return (content_field_name, mapping)
+
 
     def build_search_kwargs(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                             fields='', highlight=False, facets=None,

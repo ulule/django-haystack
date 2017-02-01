@@ -6,6 +6,8 @@ import re
 from django.template import Context, loader
 from django.utils import datetime_safe, six
 
+import elasticsearch
+
 from haystack.exceptions import SearchFieldError
 from haystack.utils import get_model_ct_tuple
 
@@ -198,6 +200,9 @@ class CharField(SearchField):
     def __init__(self, **kwargs):
         if kwargs.get('facet_class') is None:
             kwargs['facet_class'] = FacetCharField
+
+        if ((5, 0, 0) <= elasticsearch.__version__ < (6, 0, 0)) and self.field_type == 'string':
+            self.field_type = 'text'
 
         super(CharField, self).__init__(**kwargs)
 
