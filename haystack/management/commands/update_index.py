@@ -8,7 +8,7 @@ import time
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
-from django.db import close_old_connections, reset_queries
+from django.db import close_old_connections, reset_queries, DEFAULT_DB_ALIAS
 from django.utils.encoding import force_text, smart_bytes
 from django.utils.timezone import now
 
@@ -166,7 +166,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '-c', '--connection', action='store', dest='connection',
-            type=str, default='default',
+            type=str, default=DEFAULT_DB_ALIAS,
             help='db to use for read values.'
         )
 
@@ -178,7 +178,7 @@ class Command(BaseCommand):
         self.remove = options.get('remove', False)
         self.workers = options.get('workers', 0)
         self.commit = options.get('commit', True)
-        self.connection = options.get('connection', 'default')
+        self.connection = options.get('connection', DEFAULT_DB_ALIAS)
         self.max_retries = options.get('max_retries', DEFAULT_MAX_RETRIES)
 
         self.backends = options.get('using')
