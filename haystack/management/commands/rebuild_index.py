@@ -31,6 +31,11 @@ class Command(BaseCommand):
             '-b', '--batch-size', dest='batchsize', type=int,
             help='Number of items to index at once.'
         )
+        parser.add_argument(
+            '-d', '--db-read', action='store', dest='db_read',
+            type=str, default='slave',
+            help='db to use for read values.'
+        )
 
     def handle(self, **options):
         call_command('clear_index', **options)
