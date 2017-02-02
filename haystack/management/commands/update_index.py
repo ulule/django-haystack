@@ -165,8 +165,8 @@ class Command(BaseCommand):
             help='Maximum number of attempts to write to the backend when an error occurs.'
         )
         parser.add_argument(
-            '-d', '--db-read', action='store', dest='db_read',
-            type=str, default='slave',
+            '-c', '--connection', action='store', dest='connection',
+            type=str, default='default',
             help='db to use for read values.'
         )
 
@@ -178,7 +178,7 @@ class Command(BaseCommand):
         self.remove = options.get('remove', False)
         self.workers = options.get('workers', 0)
         self.commit = options.get('commit', True)
-        self.db_read = options.get('db_read', 'slave')
+        self.connection = options.get('connection', 'default')
         self.max_retries = options.get('max_retries', DEFAULT_MAX_RETRIES)
 
         self.backends = options.get('using')
@@ -240,7 +240,7 @@ class Command(BaseCommand):
                 # the loop continues and it accesses the ORM makes it better.
                 close_old_connections()
 
-            qs = index.build_queryset(using=self.db_read, start_date=self.start_date,
+            qs = index.build_queryset(using=self.connection, start_date=self.start_date,
                                       end_date=self.end_date)
 
             total = qs.count()
@@ -284,7 +284,7 @@ class Command(BaseCommand):
                 if self.start_date or self.end_date or total <= 0:
                     # They're using a reduced set, which may not incorporate
                     # all pks. Rebuild the list with everything.
-                    qs = index.index_queryset(using=self.db_read).values_list('pk', flat=True)
+                    qs = index.index_queryset(using=self.connection).values_list('pk', flat=True)
                     database_pks = set(smart_bytes(pk) for pk in qs)
 
                     total = len(database_pks)
