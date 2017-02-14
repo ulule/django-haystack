@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from django.db import DEFAULT_DB_ALIAS
 
 
 class Command(BaseCommand):
@@ -32,8 +33,8 @@ class Command(BaseCommand):
             help='Number of items to index at once.'
         )
         parser.add_argument(
-            '-d', '--db-read', action='store', dest='db_read',
-            type=str, default='slave',
+            '-c', '--connection', action='store', dest='connection',
+            type=str, default=DEFAULT_DB_ALIAS,
             help='db to use for read values.'
         )
 
