@@ -62,12 +62,21 @@ def update_worker(args):
 
 
 def do_update(backend, index, qs, start, end, total, verbosity=1, commit=True,
-              max_retries=DEFAULT_MAX_RETRIES):
+              max_retries=DEFAULT_MAX_RETRIES, update_missing=False, model=None):
 
     # Get a clone of the QuerySet so that the cache doesn't bloat up
     # in memory. Useful when reindexing large amounts of data.
-    small_cache_qs = qs.all()
+    small_cache_qs = qs.all().order_by('id')
     current_qs = small_cache_qs[start:end]
+
+    if update_missing:
+        base_count = len(current_qs)
+        ignore_ids = SearchQuerySet(using=backend.connection_alias).models(model).filter(id__in=[obj.id for obj in current_qs])
+        ignore_ids = ignore_ids.values_list('pk', flat=True)
+
+        current_qs = [obj for obj in current_qs if str(obj.id) not in ignore_ids]
+        actual_count = len(current_qs)
+        print("Indexing %d objects (instead of %d: %d already in index)." % (actual_count, base_count, base_count-actual_count))
 
     is_parent_process = hasattr(os, 'getppid') and os.getpid() == os.getppid()
 
@@ -147,6 +156,11 @@ class Command(BaseCommand):
             help='Remove objects from the index that are no longer present in the database.'
         )
         parser.add_argument(
+            '-m', '--missing', action='store_true', default=False,
+            help='Index only missing objects in database.'
+        )
+
+        parser.add_argument(
             '-u', '--using', action='append', default=[],
             help='Update only the named backend (can be used multiple times). '
                  'By default all backends will be updated.'
@@ -176,6 +190,7 @@ class Command(BaseCommand):
         self.start_date = None
         self.end_date = None
         self.remove = options.get('remove', False)
+        self.missing = options.get('missing', False)
         self.workers = options.get('workers', 0)
         self.commit = options.get('commit', True)
         self.connection = options.get('connection', DEFAULT_DB_ALIAS)
@@ -245,6 +260,10 @@ class Command(BaseCommand):
 
             total = qs.count()
 
+            update_missing = False
+            if self.missing:
+                update_missing = True
+
             if self.verbosity >= 1:
                 self.stdout.write(u"Indexing %d %s" % (
                     total, force_text(model._meta.verbose_name_plural))
@@ -260,7 +279,8 @@ class Command(BaseCommand):
 
                 if self.workers == 0:
                     do_update(backend, index, qs, start, end, total, verbosity=self.verbosity,
-                              commit=self.commit, max_retries=self.max_retries)
+                              commit=self.commit, max_retries=self.max_retries, update_missing=update_missing,
+                              model=model)
                 else:
                     ghetto_queue.append((model, start, end, total, using, self.start_date, self.end_date,
                                          self.verbosity, self.commit, self.max_retries))
